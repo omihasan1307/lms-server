@@ -1,48 +1,4 @@
-import { TAcademicSemester } from '../academicSemester/academicSemester.interface';
 import { User } from './user.model';
-
-const findLastStudentId = async () => {
-  const lastStudent = await User.findOne(
-    {
-      role: 'student',
-    },
-    {
-      id: 1,
-      _id: 0,
-    },
-  )
-    .sort({
-      createdAt: -1,
-    })
-    .lean();
-
-  return lastStudent?.id ? lastStudent.id : undefined;
-};
-
-export const generateStudentId = async (payload: TAcademicSemester) => {
-  let currentId = (0).toString();
-  const lastStudentId = await findLastStudentId();
-
-  const lastStudentSemesterCode = lastStudentId?.substring(4, 6);
-  const lastStudentYear = lastStudentId?.substring(0, 4);
-
-  const currentSemesterCode = payload.code;
-  const currentYear = payload.year;
-
-  if (
-    lastStudentId &&
-    lastStudentSemesterCode === currentSemesterCode &&
-    lastStudentYear === currentYear
-  ) {
-    currentId = lastStudentId.substring(6);
-  }
-
-  let incrementId = (Number(currentId) + 1).toString().padStart(4, '0');
-
-  incrementId = `${payload.year}${payload.code}${incrementId}`;
-
-  return incrementId;
-};
 
 // Faculty ID
 export const findLastFacultyId = async () => {
@@ -109,4 +65,18 @@ export const generateAdminId = async () => {
 
   incrementId = `A-${incrementId}`;
   return incrementId;
+};
+
+export const generateUserId = async (): Promise<string> => {
+  const lastUser = await User.findOne({}, { id: 1 }).sort({ createdAt: -1 });
+
+  let lastId = 0;
+  if (lastUser?.id) {
+    const splitId = lastUser.id.split('-')[1];
+    lastId = Number(splitId);
+  }
+
+  const newId = `U-${(lastId + 1).toString().padStart(4, '0')}`; // e.g. U-0001
+
+  return newId;
 };

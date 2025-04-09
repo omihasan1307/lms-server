@@ -6,3 +6,12 @@ export type TUser = {
   status: 'in-progress' | 'blocked';
   isDeleted: boolean;
 };
+
+export type IUser = {
+  id: string;
+  password: string;
+  username: string;
+  needsPasswordChange: boolean;
+  role: 'admin' | 'user';
+  isDeleted: boolean;
+};

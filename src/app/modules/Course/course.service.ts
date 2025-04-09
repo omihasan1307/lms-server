@@ -1,176 +1,105 @@
-import httpStatus from 'http-status';
-import mongoose from 'mongoose';
-import QueryBuilder from '../../builder/QueryBuilder';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable no-undef */
+// src/app/modules/Course/course.service.ts
+
+import { Course } from './course.model';
+import { ICourse } from './course.interface';
 import AppError from '../../errors/AppError';
-import { CourseSearchableFields } from './course.constant';
-import { TCourse, TCoursefaculty } from './course.interface';
-import { Course, CourseFaculty } from './course.model';
 
-const createCourseIntoDB = async (payload: TCourse) => {
-  const result = await Course.create(payload);
-  return result;
-};
+import { uploadToCloudinary } from '../../utils/cloudinary.utils';
 
-const getAllCoursesFromDB = async (query: Record<string, unknown>) => {
-  const courseQuery = new QueryBuilder(
-    Course.find(),
-    // .populate('preRequisiteCourses.course'),
-    query,
-  )
-    .search(CourseSearchableFields)
-    .filter()
-    .sort()
-    .paginate()
-    .fields();
-
-  const result = await courseQuery.modelQuery;
-  return result;
-};
-
-const getSingleCourseFromDB = async (id: string) => {
-  const result = await Course.findById(id).populate(
-    'preRequisiteCourses.course',
-  );
-  return result;
-};
-
-const updateCourseIntoDB = async (id: string, payload: Partial<TCourse>) => {
-  const { preRequisiteCourses, ...courseRemainingData } = payload;
-
-  const session = await mongoose.startSession();
-
-  try {
-    session.startTransaction();
-
-    //step1: basic course info update
-    const updatedBasicCourseInfo = await Course.findByIdAndUpdate(
-      id,
-      courseRemainingData,
-      {
-        new: true,
-        runValidators: true,
-        session,
-      },
-    );
-
-    if (!updatedBasicCourseInfo) {
-      throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update course');
-    }
-
-    // check if there is any pre requisite courses to update
-    if (preRequisiteCourses && preRequisiteCourses.length > 0) {
-      // filter out the deleted fields
-      const deletedPreRequisites = preRequisiteCourses
-        .filter((el) => el.course && el.isDeleted)
-        .map((el) => el.course);
-
-      const deletedPreRequisiteCourses = await Course.findByIdAndUpdate(
-        id,
-        {
-          $pull: {
-            preRequisiteCourses: { course: { $in: deletedPreRequisites } },
-          },
-        },
-        {
-          new: true,
-          runValidators: true,
-          session,
-        },
-      );
-
-      if (!deletedPreRequisiteCourses) {
-        throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update course');
-      }
-
-      // filter out the new course fields
-      const newPreRequisites = preRequisiteCourses?.filter(
-        (el) => el.course && !el.isDeleted,
-      );
-
-      const newPreRequisiteCourses = await Course.findByIdAndUpdate(
-        id,
-        {
-          $addToSet: { preRequisiteCourses: { $each: newPreRequisites } },
-        },
-        {
-          new: true,
-          runValidators: true,
-          session,
-        },
-      );
-
-      if (!newPreRequisiteCourses) {
-        throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update course');
-      }
-    }
-
-    await session.commitTransaction();
-    await session.endSession();
-
-    const result = await Course.findById(id).populate(
-      'preRequisiteCourses.course',
-    );
-
-    return result;
-  } catch (err) {
-    console.log(err);
-    await session.abortTransaction();
-    await session.endSession();
-    throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update course');
+const createCourse = async (
+  data: any,
+  file: Express.Multer.File,
+  user: any,
+): Promise<ICourse> => {
+  if (user.role !== 'admin') {
+    throw new AppError(403, 'Only admin can create courses');
   }
+
+  if (!file) {
+    throw new AppError(400, 'Thumbnail image is required');
+  }
+
+  const cloudinaryResult = await uploadToCloudinary(file.path);
+
+  const newCourse = await Course.create({
+    title: data.title,
+    price: data.price,
+    description: data.description,
+    thumbnail: cloudinaryResult.secure_url,
+    createdBy: user?.userId,
+  });
+
+  return newCourse;
 };
 
-const deleteCourseFromDB = async (id: string) => {
-  const result = await Course.findByIdAndUpdate(
-    id,
-    { isDeleted: true },
-    {
-      new: true,
+// course.service.ts
+const getAllCourses = async (filters: any): Promise<ICourse[]> => {
+  return await Course.find(filters).populate({
+    path: 'modules',
+    populate: [
+      {
+        path: 'lectures',
+        model: 'Lecture',
+      },
+    ],
+  });
+};
+
+const getSingleCourse = async (id: string): Promise<ICourse | null> => {
+  return await Course.findById(id).populate({
+    path: 'modules',
+    populate: {
+      path: 'lectures',
     },
-  );
-  return result;
+  });
+  // return await Course.findById(id).populate({
+  //   path: 'modules',
+  //   populate: [
+  //     {
+  //       path: 'lectures',
+  //       model: 'Lecture',
+  //     },
+  //   ],
+  // });
 };
 
-const assignFacultiesWithCourseIntoDB = async (
+const updateCourse = async (
   id: string,
-  payload: Partial<TCoursefaculty>,
-) => {
-  const result = await CourseFaculty.findByIdAndUpdate(
-    id,
-    {
-      course: id,
-      $addToSet: { faculties: { $each: payload } },
-    },
-    {
-      upsert: true,
-      new: true,
-    },
-  );
-  return result;
+  payload: Partial<ICourse>,
+  user: any,
+  file?: Express.Multer.File,
+): Promise<ICourse | null> => {
+  const existing = await Course.findById(id);
+  if (!existing) throw new AppError(404, 'Course not found');
+
+  if (user.role !== 'admin' || existing.createdBy !== user.userId) {
+    throw new AppError(403, 'Unauthorized to update this course');
+  }
+
+  if (file) {
+    const cloudinaryResult = await uploadToCloudinary(file.path);
+    payload.thumbnail = cloudinaryResult.secure_url;
+  }
+
+  return Course.findByIdAndUpdate(id, payload, { new: true });
 };
 
-const removeFacultiesFromCourseFromDB = async (
-  id: string,
-  payload: Partial<TCoursefaculty>,
-) => {
-  const result = await CourseFaculty.findByIdAndUpdate(
-    id,
-    {
-      $pull: { faculties: { $in: payload } },
-    },
-    {
-      new: true,
-    },
-  );
-  return result;
+const deleteCourse = async (id: string, user: any): Promise<void> => {
+  const course = await Course.findById(id);
+  if (!course) throw new AppError(404, 'Course not found');
+  if (user.role !== 'admin' || course.createdBy !== user.userId) {
+    throw new AppError(403, 'Unauthorized to delete this course');
+  }
+
+  await Course.findByIdAndDelete(id);
 };
 
-export const CourseServices = {
-  createCourseIntoDB,
-  getAllCoursesFromDB,
-  getSingleCourseFromDB,
-  updateCourseIntoDB,
-  deleteCourseFromDB,
-  assignFacultiesWithCourseIntoDB,
-  removeFacultiesFromCourseFromDB,
+export const CourseService = {
+  createCourse,
+  getAllCourses,
+  getSingleCourse,
+  updateCourse,
+  deleteCourse,
 };

@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { IModule } from '../module/module.interface';
 
 export type TPreRequisiteCourses = {
   course: Types.ObjectId;
@@ -18,3 +19,14 @@ export type TCoursefaculty = {
   course: Types.ObjectId;
   faculties: [Types.ObjectId];
 };
+
+export interface ICourse {
+  title: string;
+  price: number;
+  description: string;
+  thumbnail: string;
+  createdBy: string;
+  modules?: Types.ObjectId[] | IModule[]; 
+  createdAt?: Date;
+  updatedAt?: Date;
+}
