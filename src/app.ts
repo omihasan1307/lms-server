@@ -6,7 +6,7 @@ import router from './app/routes';
 
 const app: Application = express();
 
-const allowedOrigins = ['http://localhost:3000', 'https://your-vercel-app.vercel.app'];
+const allowedOrigins = ['http://localhost:3000', 'https://lms-client-woad.vercel.app'];
 
 app.use(
   cors({
