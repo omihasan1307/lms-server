@@ -36,17 +36,20 @@ const createCourse = async (
 
 // course.service.ts
 const getAllCourses = async (filters: any): Promise<ICourse[]> => {
-  return await Course.find(filters).populate({
-    path: 'modules',
-    populate: [
-      {
+  return await Course.find(filters)
+    .select('title thumbnail price') // Only essential fields
+    .populate({
+      path: 'modules',
+      select: 'title',
+      options: { limit: 5 }, // Limit modules per course
+      populate: {
         path: 'lectures',
-        model: 'Lecture',
+        select: 'title',
+        options: { limit: 3 }, // Limit lectures per module
       },
-    ],
-  });
+    })
+    .limit(10); // Limit total courses
 };
-
 const getSingleCourse = async (id: string): Promise<ICourse | null> => {
   return await Course.findById(id).populate({
     path: 'modules',
@@ -54,15 +57,6 @@ const getSingleCourse = async (id: string): Promise<ICourse | null> => {
       path: 'lectures',
     },
   });
-  // return await Course.findById(id).populate({
-  //   path: 'modules',
-  //   populate: [
-  //     {
-  //       path: 'lectures',
-  //       model: 'Lecture',
-  //     },
-  //   ],
-  // });
 };
 
 const updateCourse = async (

@@ -41,7 +41,7 @@ const getModules = async (req: Request, res: Response) => {
   if (title) {
     filters.title = { $regex: title, $options: 'i' };
   }
-
+  res.set('Cache-Control', 'public, max-age=60');
   const modules = await ModuleService.getModules(filters);
 
   sendResponse(res, {
@@ -53,7 +53,7 @@ const getModules = async (req: Request, res: Response) => {
 };
 
 const getSingleModule = async (req: Request, res: Response) => {
-  const { id } = req.params; 
+  const { id } = req.params;
 
   const module = await ModuleService.getModuleById(id);
 

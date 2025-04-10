@@ -30,6 +30,7 @@ export const CourseController = {
       filters.title = { $regex: title, $options: 'i' };
     }
 
+    res.set('Cache-Control', 'public, max-age=60');
     const result = await CourseService.getAllCourses(filters);
 
     sendResponse(res, {

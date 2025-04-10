@@ -37,22 +37,21 @@ const createModule = async (
 
   return populatedModule as IModule;
 };
-
+// For getModules()
 const getModules = async (filters: any): Promise<IModule[]> => {
   const modules = await Module.find(filters)
     .populate({
       path: 'course',
-      select: 'title description thumbnail price', // Select specific fields
+      select: 'title', // Only fetch absolutely necessary fields
     })
     .populate({
       path: 'lectures',
-      select: 'title duration videoUrl', // Select specific fields
-    });
+      select: 'title duration', // Skip videoUrl unless immediately needed
+      options: { limit: 10 }, // Limit nested documents
+    })
+    .limit(10); // Add top-level limit
 
-  if (!modules || modules.length === 0) {
-    throw new AppError(404, 'No modules found');
-  }
-
+  if (!modules?.length) throw new AppError(404, 'No modules found');
   return modules;
 };
 

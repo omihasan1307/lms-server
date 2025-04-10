@@ -52,7 +52,7 @@ const getLectures = async (req: Request, res: Response) => {
   if (moduleId) {
     filters['module'] = moduleId;
   }
-
+  res.set('Cache-Control', 'public, max-age=60');
   const lectures = await LectureService.getLectures(filters);
 
   sendResponse(res, {

@@ -24,19 +24,16 @@ const createLecture = async (
 };
 
 const getLectures = async (filters: any) => {
-  const lectures = await Lecture.find(filters).populate({
-    path: 'module',
-    populate: [
-      {
+  return await Lecture.find(filters)
+    .populate({
+      path: 'module',
+      select: 'title', // Only essential fields
+      populate: {
         path: 'course',
+        select: 'title', // Don't populate lectures here
       },
-      {
-        path: 'lectures',
-      },
-    ],
-  });
-
-  return lectures;
+    })
+    .limit(10); // Critical: Add limit
 };
 
 const getSingleLecture = async (id: string) => {
